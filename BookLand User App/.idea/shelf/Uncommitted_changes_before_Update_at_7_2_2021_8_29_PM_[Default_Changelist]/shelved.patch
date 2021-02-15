@@ -1,0 +1,202 @@
+Index: app/src/main/java/com/beecoder/bookstore/CatalogueFragment.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.beecoder.bookstore;\r\n\r\nimport android.content.Intent;\r\nimport android.os.Bundle;\r\nimport android.util.Log;\r\nimport android.view.LayoutInflater;\r\nimport android.view.View;\r\nimport android.view.ViewGroup;\r\n\r\nimport androidx.annotation.NonNull;\r\nimport androidx.annotation.Nullable;\r\nimport androidx.fragment.app.Fragment;\r\nimport androidx.recyclerview.widget.RecyclerView;\r\n\r\nimport com.firebase.ui.firestore.FirestoreRecyclerOptions;\r\nimport com.google.firebase.auth.FirebaseAuth;\r\nimport com.google.firebase.firestore.DocumentSnapshot;\r\nimport com.google.firebase.firestore.FirebaseFirestore;\r\nimport com.google.firebase.firestore.Query;\r\n\r\npublic class CatalogueFragment extends Fragment {\r\n    private RecyclerView categoryListView;\r\n\r\n    private CategoryAdapter adapter;\r\n\r\n    @Nullable\r\n    @Override\r\n    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {\r\n        View layout = inflater.inflate(R.layout.catalogue_layout, container, false);\r\n        categoryListView = layout.findViewById(R.id.category_recyclerList);\r\n\r\n        return layout;\r\n    }\r\n\r\n    private void initCategoryList() {\r\n        Query query = FirebaseFirestore.getInstance()\r\n                .collection(\"Category\");\r\n\r\n        FirestoreRecyclerOptions options = new FirestoreRecyclerOptions.Builder<Category>()\r\n                .setQuery(query, Category.class)\r\n                .build();\r\n\r\n        adapter = new CategoryAdapter(options);\r\n        categoryListView.setAdapter(adapter);\r\n        adapter.setOnItemClickListener(this::openCategoryItemActivity);\r\n        adapter.startListening();\r\n    }\r\n\r\n    private void openCategoryItemActivity(DocumentSnapshot snapshot) {\r\n        Intent intent = new Intent(getActivity(), CategoryItemActivity.class);\r\n        intent.putExtra(\"category\", snapshot.toObject(Category.class).getName());\r\n        startActivity(intent);\r\n    }\r\n\r\n    @Override\r\n    public void onStart() {\r\n        super.onStart();\r\n        FirebaseAuth.getInstance().addAuthStateListener(authStateListener);\r\n        if (adapter != null)\r\n            adapter.notifyDataSetChanged();\r\n    }\r\n\r\n    @Override\r\n    public void onStop() {\r\n        super.onStop();\r\n        if (authStateListener != null)\r\n            FirebaseAuth.getInstance().addAuthStateListener(authStateListener);\r\n\r\n        if (adapter != null)\r\n            adapter.stopListening();\r\n    }\r\n\r\n    private FirebaseAuth.AuthStateListener authStateListener = firebaseAuth -> {\r\n        if (firebaseAuth.getCurrentUser() != null) initCategoryList();\r\n    };\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/src/main/java/com/beecoder/bookstore/CatalogueFragment.java	(revision e6690705d3563658caa25e993b552bdea3f3f86d)
++++ app/src/main/java/com/beecoder/bookstore/CatalogueFragment.java	(date 1611414337808)
+@@ -2,7 +2,6 @@
+ 
+ import android.content.Intent;
+ import android.os.Bundle;
+-import android.util.Log;
+ import android.view.LayoutInflater;
+ import android.view.View;
+ import android.view.ViewGroup;
+@@ -10,6 +9,7 @@
+ import androidx.annotation.NonNull;
+ import androidx.annotation.Nullable;
+ import androidx.fragment.app.Fragment;
++import androidx.recyclerview.widget.GridLayoutManager;
+ import androidx.recyclerview.widget.RecyclerView;
+ 
+ import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+@@ -33,8 +33,7 @@
+     }
+ 
+     private void initCategoryList() {
+-        Query query = FirebaseFirestore.getInstance()
+-                .collection("Category");
++        Query query = FirebaseFirestore.getInstance().collection("Category");
+ 
+         FirestoreRecyclerOptions options = new FirestoreRecyclerOptions.Builder<Category>()
+                 .setQuery(query, Category.class)
+@@ -42,6 +41,7 @@
+ 
+         adapter = new CategoryAdapter(options);
+         categoryListView.setAdapter(adapter);
++        categoryListView.setLayoutManager(new GridLayoutManager(getActivity(), 2));
+         adapter.setOnItemClickListener(this::openCategoryItemActivity);
+         adapter.startListening();
+     }
+Index: ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryAdapter.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryAdapter.java	(date 1609774931504)
++++ ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryAdapter.java	(date 1609774931504)
+@@ -0,0 +1,52 @@
++package com.polinomyacademy.bookstore_admin;
++
++
++import android.view.LayoutInflater;
++import android.view.View;
++import android.view.ViewGroup;
++import android.widget.TextView;
++
++import androidx.recyclerview.widget.RecyclerView;
++
++import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
++import com.firebase.ui.firestore.FirestoreRecyclerOptions;
++import com.google.firebase.firestore.DocumentSnapshot;
++
++public class CategoryAdapter extends FirestoreRecyclerAdapter<Category, CategoryAdapter.CategoryViewHolder> {
++    private OnItemClickListener onItemClickListener;
++
++    public interface OnItemClickListener {
++        void onClick(DocumentSnapshot snapshot);
++    }
++
++    public void setOnItemClickListener(OnItemClickListener onItemClickListener) {
++        this.onItemClickListener = onItemClickListener;
++    }
++
++    public CategoryAdapter(FirestoreRecyclerOptions<Category> options) {
++        super(options);
++    }
++
++    class CategoryViewHolder extends RecyclerView.ViewHolder {
++
++        private TextView title;
++
++        public CategoryViewHolder(View itemView) {
++            super(itemView);
++            title = itemView.findViewById(R.id.category_name_tv);
++
++            itemView.setOnClickListener(v -> onItemClickListener.onClick(getSnapshots().getSnapshot(getAdapterPosition())));
++        }
++    }
++
++    @Override
++    protected void onBindViewHolder(CategoryViewHolder holder, int position, Category category) {
++        holder.title.setText(category.getName());
++    }
++
++    @Override
++    public CategoryViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
++        View itemView = LayoutInflater.from(parent.getContext()).inflate(R.layout.category_item, parent, false);
++        return new CategoryViewHolder(itemView);
++    }
++}
+Index: ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/Category.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/Category.java	(date 1609772920724)
++++ ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/Category.java	(date 1609772920724)
+@@ -0,0 +1,20 @@
++package com.polinomyacademy.bookstore_admin;
++
++class Category {
++    private String name;
++
++    public String getName() {
++        return name;
++    }
++
++    public void setName(String name) {
++        this.name = name;
++    }
++
++    public Category() {
++    }
++
++    public Category(String name) {
++        this.name = name;
++    }
++}
+Index: ../AdminApp/app/src/main/res/layout/category_item.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/res/layout/category_item.xml	(date 1609769865298)
++++ ../AdminApp/app/src/main/res/layout/category_item.xml	(date 1609769865298)
+@@ -0,0 +1,17 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="96dp"
++    android:padding="16dp"
++    android:layout_margin="4dp"
++    android:background="#77E4E4"
++    android:gravity="center_vertical"
++    android:orientation="vertical">
++    <TextView
++        android:id="@+id/category_name_tv"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:text="Story Book"
++        android:textSize="20sp"
++        android:textColor="@color/black"/>
++</LinearLayout>
+\ No newline at end of file
+Index: ../AdminApp/app/src/main/res/layout/category_add_layout.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/res/layout/category_add_layout.xml	(date 1609773646764)
++++ ../AdminApp/app/src/main/res/layout/category_add_layout.xml	(date 1609773646764)
+@@ -0,0 +1,36 @@
++<?xml version="1.0" encoding="utf-8"?>
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="wrap_content"
++    android:orientation="vertical"
++    android:padding="16dp">
++
++    <EditText
++        android:id="@+id/edt_category_name"
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content"
++        android:layout_marginBottom="16dp"
++        android:hint="Category Name" />
++
++    <LinearLayout
++        android:layout_width="match_parent"
++        android:layout_height="wrap_content">
++
++        <Button
++            android:id="@+id/cancel_button"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_marginEnd="8dp"
++            android:layout_weight="0.5"
++            android:text="Cancel" />
++
++        <Button
++            android:id="@+id/add_button"
++            android:layout_width="0dp"
++            android:layout_height="wrap_content"
++            android:layout_marginStart="8dp"
++            android:layout_weight="0.5"
++            android:text="Add" />
++    </LinearLayout>
++
++</LinearLayout>
+\ No newline at end of file

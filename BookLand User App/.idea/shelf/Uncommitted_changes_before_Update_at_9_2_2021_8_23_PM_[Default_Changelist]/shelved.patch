@@ -1,0 +1,588 @@
+Index: app/src/main/java/com/beecoder/bookstore/fragmentsMain/ProfileFragment.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.beecoder.bookstore.fragmentsMain;\r\n\r\nimport android.app.AlertDialog;\r\nimport android.content.Intent;\r\nimport android.net.Uri;\r\nimport android.os.Bundle;\r\nimport android.view.LayoutInflater;\r\nimport android.view.View;\r\nimport android.view.ViewGroup;\r\nimport android.widget.Button;\r\nimport android.widget.EditText;\r\nimport android.widget.ImageView;\r\nimport android.widget.TextView;\r\nimport android.widget.Toast;\r\n\r\nimport androidx.annotation.NonNull;\r\nimport androidx.annotation.Nullable;\r\nimport androidx.fragment.app.Fragment;\r\n\r\nimport com.beecoder.bookstore.CurrentUser;\r\nimport com.beecoder.bookstore.R;\r\nimport com.bumptech.glide.Glide;\r\nimport com.google.firebase.auth.FirebaseAuth;\r\nimport com.google.firebase.auth.FirebaseUser;\r\n\r\nimport static android.app.Activity.RESULT_OK;\r\n\r\npublic class ProfileFragment extends Fragment {\r\n    private final int IMG_REQUEST_ID = 10;\r\n\r\n    private TextView username, phoneNumber_tv, email;\r\n    private ImageView editPhone_iv, photoEdit_iv, profile_iv;\r\n    FirebaseUser user;\r\n\r\n    @Nullable\r\n    @Override\r\n    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {\r\n        View layout = inflater.inflate(R.layout.profile_layout, container, false);\r\n        user = FirebaseAuth.getInstance().getCurrentUser();\r\n        setViews(layout);\r\n        return layout;\r\n    }\r\n\r\n    private void setViews(View layout) {\r\n        email = layout.findViewById(R.id.email);\r\n        phoneNumber_tv = layout.findViewById(R.id.phone_number);\r\n        username = layout.findViewById(R.id.username);\r\n        editPhone_iv = layout.findViewById(R.id.edit_phone_number);\r\n        profile_iv = layout.findViewById(R.id.img_userProfile);\r\n        photoEdit_iv = layout.findViewById(R.id.imgBtn_photoEdit);\r\n        editPhone_iv.setOnClickListener(view -> showEditPhoneDialogue());\r\n\r\n        if (CurrentUser.getCurrentUser() != null) {\r\n            email.setText(CurrentUser.getCurrentUser().getEmail());\r\n            username.setText(CurrentUser.getCurrentUser().getName());\r\n            phoneNumber_tv.setText(CurrentUser.getCurrentUser().getPhoneNumber());\r\n            setProfilePhoto(CurrentUser.getCurrentUser().getPhotoUrl());\r\n        }\r\n        photoEdit_iv.setOnClickListener(v -> openGallery());\r\n    }\r\n\r\n    private void openGallery() {\r\n\r\n        Intent intent = new Intent();\r\n        intent.setType(\"image/*\");\r\n        intent.setAction(intent.ACTION_GET_CONTENT);\r\n        startActivityForResult(intent.createChooser(intent, \"Selected Image\"), IMG_REQUEST_ID);\r\n    }\r\n\r\n    @Override\r\n    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {\r\n        super.onActivityResult(requestCode, resultCode, data);\r\n\r\n        if (requestCode == IMG_REQUEST_ID && resultCode == RESULT_OK && data != null && data.getData() != null)\r\n            showUploadDialog(data.getData());\r\n    }\r\n\r\n    private void showUploadDialog(Uri uri) {\r\n        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());\r\n        View view = LayoutInflater.from(getActivity()).inflate(R.layout.upload_image_dialog, null);\r\n        ImageView photo_iv = view.findViewById(R.id.pic_dialog_iv);\r\n        Button cancel_btn = view.findViewById(R.id.cancel_btn);\r\n        Button upload_btn = view.findViewById(R.id.upload_btn);\r\n        builder.setView(view);\r\n        AlertDialog dialog = builder.create();\r\n        dialog.show();\r\n\r\n        Glide.with(getActivity()).load(uri).into(photo_iv);\r\n\r\n        cancel_btn.setOnClickListener(v -> dialog.dismiss());\r\n        upload_btn.setOnClickListener(v -> {\r\n            uploadImage(uri);\r\n            dialog.dismiss();\r\n        });\r\n    }\r\n\r\n    private void uploadImage(Uri uri) {\r\n        Toast.makeText(getActivity(), \"Uploading...\", Toast.LENGTH_SHORT).show();\r\n        CurrentUser.uploadPhoto(uri)\r\n                .addOnSuccessListener(s -> {\r\n                    CurrentUser.getPhotoRef().getDownloadUrl()\r\n                            .addOnSuccessListener(url -> {\r\n                                Toast.makeText(getActivity(), \"Photo Uploaded\", Toast.LENGTH_SHORT).show();\r\n                                CurrentUser.updatePhotoUrl(url.toString())\r\n                                        .addOnCompleteListener(task -> {\r\n                                            if (task.isSuccessful()) {\r\n                                                setProfilePhoto(url.toString());\r\n                                            }\r\n                                        });\r\n                            });\r\n                });\r\n    }\r\n\r\n    private void setProfilePhoto(String url) {\r\n        Glide.with(getActivity())\r\n                .load(url)\r\n                .circleCrop()\r\n                .into(profile_iv);\r\n    }\r\n\r\n    private void showEditPhoneDialogue() {\r\n        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());\r\n\r\n        EditText editText = new EditText(getActivity());\r\n        editText.setPadding(16, 16, 16, 16);\r\n        if (phoneNumber_tv.getText() != null) {\r\n            editText.setText(phoneNumber_tv.getText());\r\n        }\r\n\r\n        builder.setTitle(\"Set Phone\")\r\n                .setView(editText)\r\n                .setPositiveButton(\"Save\", (a, b) -> {\r\n                    CurrentUser.updatePhone(editText.getText().toString())\r\n                            .addOnCompleteListener(task -> {\r\n                                if (task.isSuccessful()) {\r\n                                    Toast.makeText(getActivity(), \"Successful\", Toast.LENGTH_SHORT).show();\r\n                                    phoneNumber_tv.setText(CurrentUser.getCurrentUser().getPhoneNumber());\r\n                                } else {\r\n                                    Toast.makeText(getActivity(), \"failed :\" + task.getResult(), Toast.LENGTH_SHORT).show();\r\n                                }\r\n                            });\r\n                }).setNeutralButton(\"Cancel\", null).create().show();\r\n    }\r\n}\r\n\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/src/main/java/com/beecoder/bookstore/fragmentsMain/ProfileFragment.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ app/src/main/java/com/beecoder/bookstore/fragmentsMain/ProfileFragment.java	(date 1612877963510)
+@@ -4,6 +4,7 @@
+ import android.content.Intent;
+ import android.net.Uri;
+ import android.os.Bundle;
++import android.util.Log;
+ import android.view.LayoutInflater;
+ import android.view.View;
+ import android.view.ViewGroup;
+@@ -51,6 +52,8 @@
+         editPhone_iv.setOnClickListener(view -> showEditPhoneDialogue());
+ 
+         if (CurrentUser.getCurrentUser() != null) {
++            Toast.makeText(getActivity(), "asi eikhane", Toast.LENGTH_SHORT).show();
++            Log.i("1234567890", "setViews: " + CurrentUser.getCurrentUser().toString());
+             email.setText(CurrentUser.getCurrentUser().getEmail());
+             username.setText(CurrentUser.getCurrentUser().getName());
+             phoneNumber_tv.setText(CurrentUser.getCurrentUser().getPhoneNumber());
+Index: app/src/main/java/com/beecoder/bookstore/User.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.beecoder.bookstore;\r\n\r\nimport android.net.Uri;\r\n\r\npublic class User {\r\n    private String name;\r\n    private String email;\r\n    private String phoneNumber;\r\n    private String photoUrl;\r\n\r\n    public String getId() {\r\n        return id;\r\n    }\r\n\r\n    public void setId(String id) {\r\n        this.id = id;\r\n    }\r\n\r\n    private String id;\r\n\r\n    public String getName() {\r\n        return name;\r\n    }\r\n\r\n    public void setName(String name) {\r\n        this.name = name;\r\n    }\r\n\r\n    public String getEmail() {\r\n        return email;\r\n    }\r\n\r\n    public void setEmail(String email) {\r\n        this.email = email;\r\n    }\r\n\r\n    public String getPhoneNumber() {\r\n        return phoneNumber;\r\n    }\r\n\r\n\r\n    public void setPhoneNumber(String phoneNumber) {\r\n        this.phoneNumber = phoneNumber;\r\n    }\r\n\r\n    public String getPhotoUrl() {\r\n        return photoUrl;\r\n    }\r\n\r\n    public void setPhotoUrl(String photoUrl) {\r\n        this.photoUrl = photoUrl;\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/src/main/java/com/beecoder/bookstore/User.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ app/src/main/java/com/beecoder/bookstore/User.java	(date 1612875839403)
+@@ -50,4 +50,15 @@
+     public void setPhotoUrl(String photoUrl) {
+         this.photoUrl = photoUrl;
+     }
++
++    @Override
++    public String toString() {
++        return "User{" +
++                "name='" + name + '\'' +
++                ", email='" + email + '\'' +
++                ", phoneNumber='" + phoneNumber + '\'' +
++                ", photoUrl='" + photoUrl + '\'' +
++                ", id='" + id + '\'' +
++                '}';
++    }
+ }
+Index: app/src/main/java/com/beecoder/bookstore/MainActivity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.beecoder.bookstore;\r\n\r\nimport android.content.Intent;\r\nimport android.os.Bundle;\r\nimport android.view.MenuItem;\r\nimport android.view.View;\r\nimport android.widget.TextView;\r\n\r\nimport androidx.annotation.NonNull;\r\nimport androidx.appcompat.app.ActionBarDrawerToggle;\r\nimport androidx.appcompat.app.AppCompatActivity;\r\nimport androidx.appcompat.widget.Toolbar;\r\nimport androidx.core.view.GravityCompat;\r\nimport androidx.drawerlayout.widget.DrawerLayout;\r\nimport androidx.fragment.app.Fragment;\r\n\r\nimport com.beecoder.bookstore.Authentication.AuthActivity;\r\nimport com.beecoder.bookstore.fragmentsMain.CartFragment;\r\nimport com.beecoder.bookstore.fragmentsMain.CatalogueFragment;\r\nimport com.beecoder.bookstore.fragmentsMain.ContactFragment;\r\nimport com.beecoder.bookstore.fragmentsMain.HomeFragment;\r\nimport com.beecoder.bookstore.fragmentsMain.ProfileFragment;\r\nimport com.firebase.ui.auth.AuthUI;\r\nimport com.google.android.material.navigation.NavigationView;\r\nimport com.google.firebase.auth.FirebaseAuth;\r\nimport com.google.firebase.auth.FirebaseUser;\r\n\r\npublic class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {\r\n    private FirebaseUser user;\r\n    private DrawerLayout drawerLayout;\r\n    private Toolbar toolbar;\r\n    private NavigationView navigationView;\r\n\r\n    @Override\r\n    protected void onCreate(Bundle savedInstanceState) {\r\n        super.onCreate(savedInstanceState);\r\n        setContentView(R.layout.activity_main);\r\n        user = FirebaseAuth.getInstance().getCurrentUser();\r\n\r\n        if (user == null) {\r\n            openAuthActivity();\r\n            finish();\r\n        } else {\r\n            setUserValues();\r\n            setupToolbar();\r\n            setUpNavigationDrawer(savedInstanceState);\r\n        }\r\n    }\r\n\r\n    private void setUserValues() {\r\n        CurrentUser.setCurrentUser(new User());\r\n        CurrentUser.getCurrentUser().setName(user.getDisplayName());\r\n        CurrentUser.getCurrentUser().setEmail(user.getEmail());\r\n        CurrentUser.getUserDoc()\r\n                .get().addOnSuccessListener(snapshot -> {\r\n            if (snapshot.exists()) {\r\n                User currentUser = snapshot.toObject(User.class);\r\n                CurrentUser.getCurrentUser().setPhoneNumber(currentUser.getPhoneNumber());\r\n                CurrentUser.getCurrentUser().setPhotoUrl(currentUser.getPhotoUrl());\r\n            }\r\n        });\r\n    }\r\n\r\n    private void openAuthActivity() {\r\n        startActivity(new Intent(this, AuthActivity.class));\r\n    }\r\n\r\n    private void setupToolbar() {\r\n        toolbar = findViewById(R.id.toolbar);\r\n        setSupportActionBar(toolbar);\r\n    }\r\n\r\n    private void setUpNavigationDrawer(Bundle saveInstanceState) {\r\n        drawerLayout = findViewById(R.id.drawer);\r\n        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.openDrawerContent, R.string.closeDrawerContent);\r\n        toggle.setDrawerIndicatorEnabled(true);\r\n        drawerLayout.addDrawerListener(toggle);\r\n        navigationView = findViewById(R.id.navigation);\r\n        navigationView.setNavigationItemSelectedListener(this);\r\n        toggle.syncState();\r\n\r\n        if (saveInstanceState == null) {\r\n            getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, new HomeFragment()).commit();\r\n            navigationView.setCheckedItem(R.id.home_item);\r\n        }\r\n\r\n        View headerView = navigationView.getHeaderView(0);\r\n        TextView username = headerView.findViewById(R.id.username);\r\n        TextView email = headerView.findViewById(R.id.email);\r\n        username.setText(user.getDisplayName());\r\n        email.setText(user.getEmail());\r\n    }\r\n\r\n    @Override\r\n    public void onBackPressed() {\r\n        Fragment fragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);\r\n        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {\r\n            drawerLayout.closeDrawer(GravityCompat.START);\r\n        } else if (!(fragment instanceof HomeFragment))\r\n            setFragment(new HomeFragment());\r\n        else super.onBackPressed();\r\n    }\r\n\r\n    @Override\r\n    public boolean onNavigationItemSelected(@NonNull MenuItem item) {\r\n        navigationView.setCheckedItem(item.getItemId());\r\n        switch (item.getItemId()) {\r\n            case R.id.home_item:\r\n                setFragment(new HomeFragment());\r\n                break;\r\n            case R.id.catalogue_item:\r\n                setFragment(new CatalogueFragment());\r\n                break;\r\n            case R.id.profile_item:\r\n                setFragment(new ProfileFragment());\r\n                break;\r\n            case R.id.cart_item:\r\n                setFragment(new CartFragment());\r\n                break;\r\n            case R.id.contact_item:\r\n                setFragment(new ContactFragment());\r\n                break;\r\n            case R.id.logOut_item:\r\n                AuthUI.getInstance().signOut(MainActivity.this);\r\n                startActivity(new Intent(MainActivity.this, AuthActivity.class));\r\n                CurrentUser.setCurrentUser(null);\r\n                finish();\r\n        }\r\n        drawerLayout.closeDrawer(GravityCompat.START);\r\n        return true;\r\n    }\r\n\r\n    private void setFragment(Fragment fragment) {\r\n        getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, fragment).commit();\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/src/main/java/com/beecoder/bookstore/MainActivity.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ app/src/main/java/com/beecoder/bookstore/MainActivity.java	(date 1612877499443)
+@@ -2,8 +2,10 @@
+ 
+ import android.content.Intent;
+ import android.os.Bundle;
++import android.util.Log;
+ import android.view.MenuItem;
+ import android.view.View;
++import android.widget.ImageView;
+ import android.widget.TextView;
+ 
+ import androidx.annotation.NonNull;
+@@ -20,6 +22,7 @@
+ import com.beecoder.bookstore.fragmentsMain.ContactFragment;
+ import com.beecoder.bookstore.fragmentsMain.HomeFragment;
+ import com.beecoder.bookstore.fragmentsMain.ProfileFragment;
++import com.bumptech.glide.Glide;
+ import com.firebase.ui.auth.AuthUI;
+ import com.google.android.material.navigation.NavigationView;
+ import com.google.firebase.auth.FirebaseAuth;
+@@ -30,6 +33,7 @@
+     private DrawerLayout drawerLayout;
+     private Toolbar toolbar;
+     private NavigationView navigationView;
++    public ImageView dp_iv;
+ 
+     @Override
+     protected void onCreate(Bundle savedInstanceState) {
+@@ -41,23 +45,30 @@
+             openAuthActivity();
+             finish();
+         } else {
+-            setUserValues();
+             setupToolbar();
+             setUpNavigationDrawer(savedInstanceState);
++            setUserValues();
+         }
+     }
+ 
+     private void setUserValues() {
+-        CurrentUser.setCurrentUser(new User());
++        Log.i("1234567890", "setUserValues:1 " + CurrentUser.getCurrentUser().toString());
+         CurrentUser.getCurrentUser().setName(user.getDisplayName());
+         CurrentUser.getCurrentUser().setEmail(user.getEmail());
+-        CurrentUser.getUserDoc()
++        CurrentUser.getUserCollection()
++                .document(user.getUid())
+                 .get().addOnSuccessListener(snapshot -> {
+             if (snapshot.exists()) {
+                 User currentUser = snapshot.toObject(User.class);
+                 CurrentUser.getCurrentUser().setPhoneNumber(currentUser.getPhoneNumber());
+                 CurrentUser.getCurrentUser().setPhotoUrl(currentUser.getPhotoUrl());
++                CurrentUser.getCurrentUser().setId(user.getUid());
++                Glide.with(this).load(CurrentUser.getCurrentUser().getPhotoUrl())
++                        .circleCrop()
++                        .into(dp_iv);
+             }
++
++            Log.i("1234567890", "setUserValues:2 " + CurrentUser.getCurrentUser().toString());
+         });
+     }
+ 
+@@ -87,6 +98,7 @@
+         View headerView = navigationView.getHeaderView(0);
+         TextView username = headerView.findViewById(R.id.username);
+         TextView email = headerView.findViewById(R.id.email);
++        dp_iv = headerView.findViewById(R.id.dp);
+         username.setText(user.getDisplayName());
+         email.setText(user.getEmail());
+     }
+@@ -121,9 +133,11 @@
+                 setFragment(new ContactFragment());
+                 break;
+             case R.id.logOut_item:
+-                AuthUI.getInstance().signOut(MainActivity.this);
+-                startActivity(new Intent(MainActivity.this, AuthActivity.class));
+-                CurrentUser.setCurrentUser(null);
++                CurrentUser.clearInfo();
++                Log.i("1234567890", "onNavigationItemSelected: " + CurrentUser.getCurrentUser().toString());
++                AuthUI.getInstance().signOut(this);
++                FirebaseAuth.getInstance().signOut();
++                startActivity(new Intent(this, AuthActivity.class));
+                 finish();
+         }
+         drawerLayout.closeDrawer(GravityCompat.START);
+Index: ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/SellerActivity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.polinomyacademy.bookstore_admin;\r\n\r\nimport androidx.appcompat.app.AppCompatActivity;\r\nimport androidx.recyclerview.widget.RecyclerView;\r\n\r\nimport android.os.Bundle;\r\n\r\nimport com.firebase.ui.firestore.FirestoreRecyclerOptions;\r\nimport com.google.firebase.firestore.DocumentSnapshot;\r\nimport com.google.firebase.firestore.FirebaseFirestore;\r\nimport com.google.firebase.firestore.Query;\r\n\r\npublic class SellerActivity extends AppCompatActivity {\r\n    private RecyclerView bookListView;\r\n    private BookAdapter adapter;\r\n    @Override\r\n    protected void onCreate(Bundle savedInstanceState) {\r\n        super.onCreate(savedInstanceState);\r\n        setContentView(R.layout.activity_seller);\r\n        bookListView = findViewById(R.id.book_recyclerList);\r\n    }\r\n\r\n    private void initBookList() {\r\n        Query query = FirebaseFirestore.getInstance().collection(\"Books\")\r\n                .whereEqualTo(\"approved\", true)\r\n                .whereEqualTo(\"sold\", false);\r\n\r\n        FirestoreRecyclerOptions options = new FirestoreRecyclerOptions.Builder<Book>()\r\n                .setQuery(query, Book.class)\r\n                .build();\r\n        adapter = new BookAdapter(options, this);\r\n        bookListView.setAdapter(adapter);\r\n        adapter.setOnAddToCartClickListener(this::addToCart);\r\n        adapter.startListening();\r\n        CartDatabase cartDatabase = new CartDatabase();\r\n        cartDatabase.getBookIds().addSnapshotListener((value, error) -> {\r\n            if (!value.isEmpty()) {\r\n                Carts.clearAll();\r\n                for (DocumentSnapshot snapshot : value.getDocuments())\r\n                    Carts.addBookId(snapshot.getId());\r\n                adapter.notifyDataSetChanged();\r\n            }\r\n        });\r\n    }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/SellerActivity.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/SellerActivity.java	(date 1612874270900)
+@@ -1,10 +1,12 @@
+ package com.polinomyacademy.bookstore_admin;
+ 
++import android.os.Bundle;
++import android.widget.TextView;
++
+ import androidx.appcompat.app.AppCompatActivity;
++import androidx.appcompat.widget.Toolbar;
+ import androidx.recyclerview.widget.RecyclerView;
+ 
+-import android.os.Bundle;
+-
+ import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+ import com.google.firebase.firestore.DocumentSnapshot;
+ import com.google.firebase.firestore.FirebaseFirestore;
+@@ -13,33 +15,41 @@
+ public class SellerActivity extends AppCompatActivity {
+     private RecyclerView bookListView;
+     private BookAdapter adapter;
++
+     @Override
+     protected void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+         setContentView(R.layout.activity_seller);
+-        bookListView = findViewById(R.id.book_recyclerList);
++
++        setToolbar("Seller");
++        initBookList();
+     }
++
++    private void setToolbar(String title) {
++        Toolbar toolbar = findViewById(R.id.toolbar_main);
++        TextView tv_title = toolbar.findViewById(R.id.tv_titleToolbar);
++        tv_title.setText(title);
++    }
++
+ 
+     private void initBookList() {
++        bookListView = findViewById(R.id.book_recyclerList);
+         Query query = FirebaseFirestore.getInstance().collection("Books")
+-                .whereEqualTo("approved", true)
+-                .whereEqualTo("sold", false);
++                .whereEqualTo("approved", false);
+ 
+         FirestoreRecyclerOptions options = new FirestoreRecyclerOptions.Builder<Book>()
+                 .setQuery(query, Book.class)
+                 .build();
+         adapter = new BookAdapter(options, this);
+         bookListView.setAdapter(adapter);
+-        adapter.setOnAddToCartClickListener(this::addToCart);
++        adapter.setOnAddToCartClickListener(this::approveBook);
+         adapter.startListening();
+-        CartDatabase cartDatabase = new CartDatabase();
+-        cartDatabase.getBookIds().addSnapshotListener((value, error) -> {
+-            if (!value.isEmpty()) {
+-                Carts.clearAll();
+-                for (DocumentSnapshot snapshot : value.getDocuments())
+-                    Carts.addBookId(snapshot.getId());
+-                adapter.notifyDataSetChanged();
+-            }
+-        });
++    }
++
++    private void approveBook(DocumentSnapshot snapshot) {
++        Book book = snapshot.toObject(Book.class);
++        book.setApproved(true);
++        FirebaseFirestore.getInstance().collection("Books").document(snapshot.getId()).set(book);
++        adapter.notifyDataSetChanged();
+     }
+ }
+\ No newline at end of file
+Index: app/src/main/java/com/beecoder/bookstore/CurrentUser.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.beecoder.bookstore;\r\n\r\nimport android.net.Uri;\r\n\r\nimport com.google.android.gms.tasks.Task;\r\nimport com.google.firebase.auth.FirebaseAuth;\r\nimport com.google.firebase.auth.FirebaseUser;\r\nimport com.google.firebase.firestore.DocumentReference;\r\nimport com.google.firebase.firestore.FirebaseFirestore;\r\nimport com.google.firebase.storage.FirebaseStorage;\r\nimport com.google.firebase.storage.StorageReference;\r\nimport com.google.firebase.storage.UploadTask;\r\n\r\npublic class CurrentUser {\r\n    private static FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();\r\n    private static StorageReference photoRef = FirebaseStorage.getInstance().getReference().child(\"images\").child(user.getUid());\r\n    private static DocumentReference userDoc = FirebaseFirestore.getInstance().collection(\"Users\").document(user.getUid());\r\n\r\n    private static User currentUser = new User();\r\n\r\n    public static User getCurrentUser() {\r\n        return currentUser;\r\n    }\r\n\r\n    public static void setCurrentUser(User currentUser) {\r\n        CurrentUser.currentUser = currentUser;\r\n    }\r\n\r\n    public static DocumentReference getUserDoc() {\r\n        return userDoc;\r\n    }\r\n\r\n    public static Task<Void> updatePhone(String phoneNumber) {\r\n        currentUser.setPhoneNumber(phoneNumber);\r\n        return userDoc.set(currentUser);\r\n    }\r\n\r\n    public static UploadTask uploadPhoto(Uri uri) {\r\n        photoRef = photoRef.child(uri.hashCode() + \"\");\r\n        return photoRef.putFile(uri);\r\n    }\r\n\r\n    public static Task<Void> updatePhotoUrl(String url) {\r\n        currentUser.setPhotoUrl(url);\r\n        return userDoc.set(currentUser);\r\n    }\r\n\r\n    public static StorageReference getPhotoRef() {\r\n        return photoRef;\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- app/src/main/java/com/beecoder/bookstore/CurrentUser.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ app/src/main/java/com/beecoder/bookstore/CurrentUser.java	(date 1612876777043)
+@@ -5,7 +5,7 @@
+ import com.google.android.gms.tasks.Task;
+ import com.google.firebase.auth.FirebaseAuth;
+ import com.google.firebase.auth.FirebaseUser;
+-import com.google.firebase.firestore.DocumentReference;
++import com.google.firebase.firestore.CollectionReference;
+ import com.google.firebase.firestore.FirebaseFirestore;
+ import com.google.firebase.storage.FirebaseStorage;
+ import com.google.firebase.storage.StorageReference;
+@@ -14,7 +14,7 @@
+ public class CurrentUser {
+     private static FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+     private static StorageReference photoRef = FirebaseStorage.getInstance().getReference().child("images").child(user.getUid());
+-    private static DocumentReference userDoc = FirebaseFirestore.getInstance().collection("Users").document(user.getUid());
++    private static CollectionReference userCollection = FirebaseFirestore.getInstance().collection("Users");
+ 
+     private static User currentUser = new User();
+ 
+@@ -22,17 +22,21 @@
+         return currentUser;
+     }
+ 
+-    public static void setCurrentUser(User currentUser) {
+-        CurrentUser.currentUser = currentUser;
++    public static void clearInfo() {
++        currentUser.setPhotoUrl("");
++        currentUser.setPhoneNumber("");
++        currentUser.setId("");
++        currentUser.setEmail("");
++        currentUser.setName("");
+     }
+ 
+-    public static DocumentReference getUserDoc() {
+-        return userDoc;
++    public static CollectionReference getUserCollection() {
++        return userCollection;
+     }
+ 
+     public static Task<Void> updatePhone(String phoneNumber) {
+         currentUser.setPhoneNumber(phoneNumber);
+-        return userDoc.set(currentUser);
++        return userCollection.document(user.getUid()).set(currentUser);
+     }
+ 
+     public static UploadTask uploadPhoto(Uri uri) {
+@@ -42,7 +46,7 @@
+ 
+     public static Task<Void> updatePhotoUrl(String url) {
+         currentUser.setPhotoUrl(url);
+-        return userDoc.set(currentUser);
++        return userCollection.document(user.getUid()).set(currentUser);
+     }
+ 
+     public static StorageReference getPhotoRef() {
+Index: ../AdminApp/app/src/main/res/layout/book_item.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<androidx.cardview.widget.CardView xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    xmlns:app=\"http://schemas.android.com/apk/res-auto\"\r\n    android:layout_width=\"wrap_content\"\r\n    android:layout_height=\"wrap_content\"\r\n    android:layout_marginLeft=\"8dp\"\r\n    android:layout_marginTop=\"8dp\"\r\n    android:layout_marginRight=\"8dp\"\r\n    android:elevation=\"8dp\"\r\n    app:cardCornerRadius=\"4dp\">\r\n    <LinearLayout\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"match_parent\"\r\n        android:orientation=\"vertical\">\r\n\r\n        <ImageView\r\n            android:id=\"@+id/bookCover\"\r\n            android:layout_width=\"match_parent\"\r\n            android:layout_height=\"200dp\"\r\n            android:layout_gravity=\"center\"\r\n            android:background=\"@drawable/ic_book\" />\r\n\r\n        <LinearLayout\r\n            android:layout_width=\"match_parent\"\r\n            android:layout_height=\"match_parent\"\r\n            android:background=\"@android:color/white\"\r\n            android:orientation=\"vertical\"\r\n            android:paddingLeft=\"16dp\"\r\n            android:paddingTop=\"16dp\"\r\n            android:paddingRight=\"16dp\">\r\n\r\n            <LinearLayout\r\n                android:layout_width=\"match_parent\"\r\n                android:layout_height=\"wrap_content\"\r\n                android:layout_weight=\"8\"\r\n                android:orientation=\"vertical\">\r\n\r\n                <TextView\r\n                    android:id=\"@+id/txt_bookName\"\r\n                    android:layout_width=\"wrap_content\"\r\n                    android:layout_height=\"wrap_content\"\r\n                    android:layout_toRightOf=\"@+id/bookCover\"\r\n                    android:text=\"Sananda's Biography\"\r\n                    android:textSize=\"16sp\"\r\n                    android:textStyle=\"bold\" />\r\n\r\n                <TextView\r\n                    android:id=\"@+id/txt_eiditipn\"\r\n                    android:layout_width=\"wrap_content\"\r\n\r\n                    android:layout_height=\"wrap_content\"\r\n                    android:layout_below=\"@+id/txt_bookName\"\r\n                    android:text=\"5th edition\" />\r\n\r\n                <TextView\r\n                    android:id=\"@+id/txt_authorName\"\r\n                    android:layout_width=\"wrap_content\"\r\n                    android:layout_height=\"wrap_content\"\r\n                    android:text=\"Sananda\" />\r\n\r\n\r\n                <TextView\r\n                    android:id=\"@+id/txt_price\"\r\n                    android:layout_width=\"wrap_content\"\r\n                    android:layout_height=\"wrap_content\"\r\n                    android:text=\"200tk \" />\r\n\r\n                <TextView\r\n                    android:id=\"@+id/txt_category\"\r\n                    android:layout_width=\"wrap_content\"\r\n                    android:layout_height=\"wrap_content\"\r\n                    android:text=\"Math\" />\r\n\r\n            </LinearLayout>\r\n\r\n            <LinearLayout\r\n                android:layout_width=\"match_parent\"\r\n                android:layout_height=\"wrap_content\"\r\n                android:layout_weight=\"2\"\r\n                android:gravity=\"bottom\"\r\n                android:orientation=\"horizontal\"\r\n                android:paddingBottom=\"8dp\"\r\n                android:paddingTop=\"8dp\">\r\n\r\n                <Button\r\n                    android:id=\"@+id/btn_addCart\"\r\n                    android:layout_width=\"wrap_content\"\r\n                    android:layout_height=\"wrap_content\"\r\n                    android:background=\"@drawable/add_to_cart_bg\"\r\n                    android:drawableRight=\"@drawable/ic_cart\"\r\n                    android:padding=\"8dp\"\r\n                    android:text=\"Add to Cart\" />\r\n            </LinearLayout>\r\n        </LinearLayout>\r\n\r\n\r\n    </LinearLayout>\r\n\r\n</androidx.cardview.widget.CardView>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/res/layout/book_item.xml	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/res/layout/book_item.xml	(date 1612874270916)
+@@ -1,13 +1,14 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+-    android:layout_width="wrap_content"
++    android:layout_width="match_parent"
+     android:layout_height="wrap_content"
+     android:layout_marginLeft="8dp"
+     android:layout_marginTop="8dp"
+     android:layout_marginRight="8dp"
+     android:elevation="8dp"
+     app:cardCornerRadius="4dp">
++
+     <LinearLayout
+         android:layout_width="match_parent"
+         android:layout_height="match_parent"
+@@ -17,8 +18,7 @@
+             android:id="@+id/bookCover"
+             android:layout_width="match_parent"
+             android:layout_height="200dp"
+-            android:layout_gravity="center"
+-            android:background="@drawable/ic_book" />
++            android:layout_gravity="center" />
+ 
+         <LinearLayout
+             android:layout_width="match_parent"
+@@ -79,17 +79,15 @@
+                 android:layout_weight="2"
+                 android:gravity="bottom"
+                 android:orientation="horizontal"
+-                android:paddingBottom="8dp"
+-                android:paddingTop="8dp">
++                android:paddingTop="8dp"
++                android:paddingBottom="8dp">
+ 
+                 <Button
+-                    android:id="@+id/btn_addCart"
+-                    android:layout_width="wrap_content"
++                    android:id="@+id/btn_approve"
++                    android:layout_width="match_parent"
+                     android:layout_height="wrap_content"
+-                    android:background="@drawable/add_to_cart_bg"
+-                    android:drawableRight="@drawable/ic_cart"
+                     android:padding="8dp"
+-                    android:text="Add to Cart" />
++                    android:text="Approve" />
+             </LinearLayout>
+         </LinearLayout>
+ 
+Index: ../AdminApp/app/src/main/res/layout/toolbar.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/res/layout/toolbar.xml	(date 1612874008085)
++++ ../AdminApp/app/src/main/res/layout/toolbar.xml	(date 1612874008085)
+@@ -0,0 +1,27 @@
++<?xml version="1.0" encoding="utf-8"?>
++<com.google.android.material.appbar.AppBarLayout xmlns:android="http://schemas.android.com/apk/res/android"
++    android:layout_width="match_parent"
++    android:layout_height="?attr/actionBarSize">
++
++    <androidx.appcompat.widget.Toolbar
++        android:id="@+id/toolbar_main"
++        android:layout_width="match_parent"
++        android:layout_height="match_parent">
++
++        <RelativeLayout
++            android:layout_width="match_parent"
++            android:layout_height="match_parent">
++
++            <TextView
++                android:id="@+id/tv_titleToolbar"
++                android:layout_width="wrap_content"
++                android:layout_height="wrap_content"
++                android:layout_centerVertical="true"
++                android:text="title"
++                android:textColor="@color/white"
++                android:textSize="20sp"
++                android:textStyle="bold" />
++        </RelativeLayout>
++    </androidx.appcompat.widget.Toolbar>
++
++</com.google.android.material.appbar.AppBarLayout>
+\ No newline at end of file
+Index: ../AdminApp/app/src/main/res/layout/activity_category.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    xmlns:app=\"http://schemas.android.com/apk/res-auto\"\r\n    xmlns:tools=\"http://schemas.android.com/tools\"\r\n    android:layout_width=\"match_parent\"\r\n    android:layout_height=\"match_parent\"\r\n    android:orientation=\"vertical\"\r\n    tools:context=\".CategoryActivity\">\r\n\r\n    <Button\r\n        android:id=\"@+id/btn_addCategory\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"wrap_content\"\r\n        android:layout_margin=\"4dp\"\r\n        android:text=\"Add Category\" />\r\n    <androidx.recyclerview.widget.RecyclerView\r\n        android:id=\"@+id/categoryListView\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"match_parent\"\r\n        app:layoutManager=\"androidx.recyclerview.widget.LinearLayoutManager\"\r\n        tools:listitem=\"@layout/category_item\" />\r\n</LinearLayout>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/res/layout/activity_category.xml	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/res/layout/activity_category.xml	(date 1612873308077)
+@@ -7,12 +7,15 @@
+     android:orientation="vertical"
+     tools:context=".CategoryActivity">
+ 
++    <include layout="@layout/toolbar" />
++
+     <Button
+         android:id="@+id/btn_addCategory"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:layout_margin="4dp"
+         android:text="Add Category" />
++
+     <androidx.recyclerview.widget.RecyclerView
+         android:id="@+id/categoryListView"
+         android:layout_width="match_parent"
+Index: ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryActivity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.polinomyacademy.bookstore_admin;\r\n\r\nimport android.os.Bundle;\r\nimport android.view.LayoutInflater;\r\nimport android.view.View;\r\nimport android.widget.Button;\r\nimport android.widget.EditText;\r\nimport android.widget.Toast;\r\n\r\nimport androidx.appcompat.app.AlertDialog;\r\nimport androidx.appcompat.app.AppCompatActivity;\r\nimport androidx.recyclerview.widget.RecyclerView;\r\n\r\nimport com.firebase.ui.firestore.FirestoreRecyclerOptions;\r\nimport com.google.firebase.firestore.CollectionReference;\r\nimport com.google.firebase.firestore.FirebaseFirestore;\r\nimport com.google.firebase.firestore.Query;\r\n\r\npublic class CategoryActivity extends AppCompatActivity {\r\n    private Button addCategoryButton;\r\n    private RecyclerView categoryListView;\r\n    private CategoryAdapter adapter;\r\n\r\n    @Override\r\n    protected void onCreate(Bundle savedInstanceState) {\r\n        super.onCreate(savedInstanceState);\r\n        setContentView(R.layout.activity_category);\r\n\r\n        addCategoryButton = findViewById(R.id.btn_addCategory);\r\n        addCategoryButton.setOnClickListener(v -> handleOnClick());\r\n        categoryListView = findViewById(R.id.categoryListView);\r\n        initCategoryList();\r\n    }\r\n\r\n    private void handleOnClick() {\r\n        AlertDialog.Builder builder = new AlertDialog.Builder(this);\r\n        View view = LayoutInflater.from(this).inflate(R.layout.category_add_layout, null);\r\n        builder.setView(view);\r\n        AlertDialog dialog = builder.create();\r\n        dialog.show();\r\n        Button add = view.findViewById(R.id.add_button);\r\n        Button cancel = view.findViewById(R.id.cancel_button);\r\n        EditText name_edt = view.findViewById(R.id.edt_category_name);\r\n\r\n        add.setOnClickListener(v -> {\r\n            addToDatabase(name_edt.getText().toString());\r\n            dialog.dismiss();\r\n        });\r\n        cancel.setOnClickListener(v -> dialog.dismiss());\r\n    }\r\n\r\n    private void addToDatabase(String name) {\r\n        FirebaseFirestore firestore = FirebaseFirestore.getInstance();\r\n        CollectionReference categoryCollection = firestore.collection(\"Category\");\r\n        categoryCollection.add(new Category(name))\r\n                .addOnCompleteListener(task -> {\r\n                    if (task.isSuccessful()) {\r\n                        Toast.makeText(this, name + \" is successfully added\", Toast.LENGTH_SHORT).show();\r\n                    }\r\n                });\r\n    }\r\n\r\n    private void initCategoryList() {\r\n        Query query = FirebaseFirestore.getInstance()\r\n                .collection(\"Category\");\r\n\r\n        FirestoreRecyclerOptions options = new FirestoreRecyclerOptions.Builder<Category>()\r\n                .setQuery(query, Category.class)\r\n                .build();\r\n\r\n        adapter = new CategoryAdapter(options);\r\n        categoryListView.setAdapter(adapter);\r\n        adapter.startListening();\r\n    }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryActivity.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryActivity.java	(date 1612874008056)
+@@ -5,10 +5,12 @@
+ import android.view.View;
+ import android.widget.Button;
+ import android.widget.EditText;
++import android.widget.TextView;
+ import android.widget.Toast;
+ 
+ import androidx.appcompat.app.AlertDialog;
+ import androidx.appcompat.app.AppCompatActivity;
++import androidx.appcompat.widget.Toolbar;
+ import androidx.recyclerview.widget.RecyclerView;
+ 
+ import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+@@ -26,6 +28,7 @@
+         super.onCreate(savedInstanceState);
+         setContentView(R.layout.activity_category);
+ 
++        setToolbar("Category");
+         addCategoryButton = findViewById(R.id.btn_addCategory);
+         addCategoryButton.setOnClickListener(v -> handleOnClick());
+         categoryListView = findViewById(R.id.categoryListView);
+@@ -72,4 +75,11 @@
+         categoryListView.setAdapter(adapter);
+         adapter.startListening();
+     }
++
++    private void setToolbar(String title) {
++        Toolbar toolbar = findViewById(R.id.toolbar_main);
++        TextView tv_title = toolbar.findViewById(R.id.tv_titleToolbar);
++        tv_title.setText(title);
++    }
++
+ }
+\ No newline at end of file
+Index: ../AdminApp/app/src/main/res/layout/activity_buyer.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<androidx.constraintlayout.widget.ConstraintLayout xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    xmlns:app=\"http://schemas.android.com/apk/res-auto\"\r\n    xmlns:tools=\"http://schemas.android.com/tools\"\r\n    android:layout_width=\"match_parent\"\r\n    android:layout_height=\"match_parent\"\r\n    tools:context=\".BuyerActivity\">\r\n\r\n</androidx.constraintlayout.widget.ConstraintLayout>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/res/layout/activity_buyer.xml	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/res/layout/activity_buyer.xml	(date 1612873308120)
+@@ -1,9 +1,10 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+-    xmlns:app="http://schemas.android.com/apk/res-auto"
++<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:tools="http://schemas.android.com/tools"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"
++    android:orientation="vertical"
+     tools:context=".BuyerActivity">
+ 
+-</androidx.constraintlayout.widget.ConstraintLayout>
+\ No newline at end of file
++    <include layout="@layout/toolbar" />
++</LinearLayout>
+\ No newline at end of file
+Index: ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/BuyerActivity.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.polinomyacademy.bookstore_admin;\r\n\r\nimport androidx.appcompat.app.AppCompatActivity;\r\n\r\nimport android.os.Bundle;\r\n\r\npublic class BuyerActivity extends AppCompatActivity {\r\n\r\n    @Override\r\n    protected void onCreate(Bundle savedInstanceState) {\r\n        super.onCreate(savedInstanceState);\r\n        setContentView(R.layout.activity_buyer);\r\n    }\r\n}
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/BuyerActivity.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/BuyerActivity.java	(date 1612874008119)
+@@ -1,8 +1,10 @@
+ package com.polinomyacademy.bookstore_admin;
+ 
+-import androidx.appcompat.app.AppCompatActivity;
+-
+ import android.os.Bundle;
++import android.widget.TextView;
++
++import androidx.appcompat.app.AppCompatActivity;
++import androidx.appcompat.widget.Toolbar;
+ 
+ public class BuyerActivity extends AppCompatActivity {
+ 
+@@ -10,5 +12,14 @@
+     protected void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+         setContentView(R.layout.activity_buyer);
++
++        setToolbar("Buyer");
+     }
++
++    private void setToolbar(String title) {
++        Toolbar toolbar = findViewById(R.id.toolbar_main);
++        TextView tv_title = toolbar.findViewById(R.id.tv_titleToolbar);
++        tv_title.setText(title);
++    }
++
+ }
+\ No newline at end of file
+Index: ../AdminApp/app/src/main/res/layout/activity_seller.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+><?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\"\r\n    xmlns:app=\"http://schemas.android.com/apk/res-auto\"\r\n    xmlns:tools=\"http://schemas.android.com/tools\"\r\n    android:layout_width=\"match_parent\"\r\n    android:layout_height=\"match_parent\"\r\n    tools:context=\".SellerActivity\">\r\n\r\n    <androidx.recyclerview.widget.RecyclerView\r\n        android:id=\"@+id/book_recyclerList\"\r\n        android:layout_width=\"match_parent\"\r\n        android:layout_height=\"wrap_content\"\r\n        app:layoutManager=\"androidx.recyclerview.widget.GridLayoutManager\"\r\n        app:spanCount=\"2\"\r\n        tools:listitem=\"@layout/book_item\" />\r\n\r\n</LinearLayout>
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/res/layout/activity_seller.xml	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/res/layout/activity_seller.xml	(date 1612873308150)
+@@ -4,8 +4,11 @@
+     xmlns:tools="http://schemas.android.com/tools"
+     android:layout_width="match_parent"
+     android:layout_height="match_parent"
++    android:orientation="vertical"
+     tools:context=".SellerActivity">
+ 
++    <include layout="@layout/toolbar" />
++
+     <androidx.recyclerview.widget.RecyclerView
+         android:id="@+id/book_recyclerList"
+         android:layout_width="match_parent"
+Index: ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryAdapter.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.polinomyacademy.bookstore_admin;\r\n\r\n\r\nimport android.view.LayoutInflater;\r\nimport android.view.View;\r\nimport android.view.ViewGroup;\r\nimport android.widget.TextView;\r\n\r\nimport androidx.recyclerview.widget.RecyclerView;\r\n\r\nimport com.firebase.ui.firestore.FirestoreRecyclerAdapter;\r\nimport com.firebase.ui.firestore.FirestoreRecyclerOptions;\r\nimport com.google.firebase.firestore.DocumentSnapshot;\r\n\r\npublic class CategoryAdapter extends FirestoreRecyclerAdapter<Category, CategoryAdapter.CategoryViewHolder> {\r\n    private OnItemClickListener onItemClickListener;\r\n\r\n    public interface OnItemClickListener {\r\n        void onClick(DocumentSnapshot snapshot);\r\n    }\r\n\r\n    public void setOnItemClickListener(OnItemClickListener onItemClickListener) {\r\n        this.onItemClickListener = onItemClickListener;\r\n    }\r\n\r\n    public CategoryAdapter(FirestoreRecyclerOptions<Category> options) {\r\n        super(options);\r\n    }\r\n\r\n    class CategoryViewHolder extends RecyclerView.ViewHolder {\r\n\r\n        private TextView title;\r\n\r\n        public CategoryViewHolder(View itemView) {\r\n            super(itemView);\r\n            title = itemView.findViewById(R.id.category_name_tv);\r\n\r\n            itemView.setOnClickListener(v -> onItemClickListener.onClick(getSnapshots().getSnapshot(getAdapterPosition())));\r\n        }\r\n    }\r\n\r\n    @Override\r\n    protected void onBindViewHolder(CategoryViewHolder holder, int position, Category category) {\r\n        holder.title.setText(category.getName());\r\n    }\r\n\r\n    @Override\r\n    public CategoryViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {\r\n        View itemView = LayoutInflater.from(parent.getContext()).inflate(R.layout.category_item, parent, false);\r\n        return new CategoryViewHolder(itemView);\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryAdapter.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/CategoryAdapter.java	(date 1612873744115)
+@@ -10,18 +10,8 @@
+ 
+ import com.firebase.ui.firestore.FirestoreRecyclerAdapter;
+ import com.firebase.ui.firestore.FirestoreRecyclerOptions;
+-import com.google.firebase.firestore.DocumentSnapshot;
+ 
+ public class CategoryAdapter extends FirestoreRecyclerAdapter<Category, CategoryAdapter.CategoryViewHolder> {
+-    private OnItemClickListener onItemClickListener;
+-
+-    public interface OnItemClickListener {
+-        void onClick(DocumentSnapshot snapshot);
+-    }
+-
+-    public void setOnItemClickListener(OnItemClickListener onItemClickListener) {
+-        this.onItemClickListener = onItemClickListener;
+-    }
+ 
+     public CategoryAdapter(FirestoreRecyclerOptions<Category> options) {
+         super(options);
+@@ -34,8 +24,6 @@
+         public CategoryViewHolder(View itemView) {
+             super(itemView);
+             title = itemView.findViewById(R.id.category_name_tv);
+-
+-            itemView.setOnClickListener(v -> onItemClickListener.onClick(getSnapshots().getSnapshot(getAdapterPosition())));
+         }
+     }
+ 
+Index: ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/BookAdapter.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.polinomyacademy.bookstore_admin;\r\n\r\n\r\nimport android.content.Context;\r\nimport android.view.LayoutInflater;\r\nimport android.view.View;\r\nimport android.view.ViewGroup;\r\nimport android.widget.Button;\r\nimport android.widget.ImageView;\r\nimport android.widget.TextView;\r\n\r\nimport androidx.annotation.NonNull;\r\nimport androidx.recyclerview.widget.RecyclerView;\r\n\r\nimport com.bumptech.glide.Glide;\r\nimport com.firebase.ui.firestore.FirestoreRecyclerAdapter;\r\nimport com.firebase.ui.firestore.FirestoreRecyclerOptions;\r\nimport com.google.firebase.firestore.DocumentSnapshot;\r\n\r\npublic class BookAdapter extends FirestoreRecyclerAdapter<Book, BookAdapter.bookHolder> {\r\n\r\n    private Context context;\r\n    public OnAddToCartClickListener onAddToCartClickListener;\r\n\r\n    public interface OnAddToCartClickListener {\r\n        void onClick(DocumentSnapshot snapshot);\r\n    }\r\n\r\n    public void setOnAddToCartClickListener(OnAddToCartClickListener onAddToCartClickListener) {\r\n        this.onAddToCartClickListener = onAddToCartClickListener;\r\n    }\r\n\r\n    public BookAdapter(@NonNull FirestoreRecyclerOptions<Book> options, Context context) {\r\n        super(options);\r\n        this.context = context;\r\n    }\r\n\r\n    @Override\r\n    protected void onBindViewHolder(@NonNull bookHolder holder, int position, @NonNull Book book) {\r\n        holder.bookName.setText(book.getTitle());\r\n        holder.authorName.setText(book.getAuthorName());\r\n        holder.edition.setText(book.getEdition());\r\n        holder.price.setText(book.getPrice());\r\n        holder.category.setText(book.getCategory());\r\n        holder.btn_approved.setOnClickListener(v ->\r\n                onAddToCartClickListener.onClick(getSnapshots().getSnapshot(position)));\r\n        Glide.with(context)\r\n                .load(book.getImageUrl())\r\n                .centerCrop()\r\n                .into(holder.bookCover);\r\n    }\r\n\r\n    @NonNull\r\n    @Override\r\n    public bookHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {\r\n        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.book_item, parent, false);\r\n        return new bookHolder(view);\r\n    }\r\n\r\n    class bookHolder extends RecyclerView.ViewHolder {\r\n\r\n        TextView bookName, authorName, edition, price, category;\r\n        ImageView bookCover;\r\n        Button btn_approved;\r\n\r\n        public bookHolder(@NonNull View itemView) {\r\n            super(itemView);\r\n            bookName = itemView.findViewById(R.id.txt_bookName);\r\n            authorName = itemView.findViewById(R.id.txt_authorName);\r\n            edition = itemView.findViewById(R.id.txt_eiditipn);\r\n            price = itemView.findViewById(R.id.txt_price);\r\n            category = itemView.findViewById(R.id.txt_category);\r\n            bookCover = itemView.findViewById(R.id.bookCover);\r\n            btn_approved = itemView.findViewById(R.id.btn_addCart);\r\n        }\r\n    }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/BookAdapter.java	(revision b1f0177b14e5d0c45cd76151e2784be3332e5102)
++++ ../AdminApp/app/src/main/java/com/polinomyacademy/bookstore_admin/BookAdapter.java	(date 1612872594120)
+@@ -71,7 +71,7 @@
+             price = itemView.findViewById(R.id.txt_price);
+             category = itemView.findViewById(R.id.txt_category);
+             bookCover = itemView.findViewById(R.id.bookCover);
+-            btn_approved = itemView.findViewById(R.id.btn_addCart);
++            btn_approved = itemView.findViewById(R.id.btn_approve);
+         }
+     }
+ }
